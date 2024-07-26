@@ -53,4 +53,16 @@ jobs:
           fi
 
       - name: "dotnet pack"
-        run: dotnet pack -c Release
+        run: dotnet pack -c Release -o /bin/nuget
+
+      - name: "Create .NET Framework Console App and Install Akka.Analyzers"
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          # Create a new .NET Framework 4.8 console application
+          dotnet new console -o DotNetFrameworkApp -f net48
+          cd DotNetFrameworkApp
+          
+          # Install Akka.Analyzers from the local NuGet source
+          dotnet nuget add source ../bin/nuget -n local
+          dotnet add package Akka.Analyzers --source local
