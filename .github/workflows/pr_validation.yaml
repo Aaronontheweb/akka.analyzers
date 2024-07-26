@@ -55,24 +55,42 @@ jobs:
       - name: "dotnet pack"
         run: dotnet pack -c Release -o ./bin/nuget
 
-      - name: "Create .NET Framework Console App and Install Akka.Analyzers"
+     - name: "Create .NET Framework Console App and Install Akka.Analyzers"
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # Create a new .NET Core console application
-          dotnet new console -o DotNetFrameworkApp --use-program-main
+          # Add the local NuGet source
+          dotnet nuget add source ./bin/nuget -n local
+
+          # Create a directory for the .NET Framework app
+          mkdir DotNetFrameworkApp
           cd DotNetFrameworkApp
 
-          # Modify the TargetFramework to net48
-          $projectFile = 'DotNetFrameworkApp.csproj'
-          (Get-Content $projectFile) -replace '<TargetFramework>[^<]*</TargetFramework>', '<TargetFramework>net48</TargetFramework>' | Set-Content $projectFile
+          # Create a new .NET Framework 4.8 console application manually
+          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
+          <Project Sdk=\"Microsoft.NET.Sdk\">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net48</TargetFramework>
+              <LangVersion>7.3</LangVersion>
+            </PropertyGroup>
+          </Project>" > DotNetFrameworkApp.csproj
+
+          # Create a basic Program.cs file
+          echo "using System;
+          class Program
+          {
+              static void Main()
+              {
+                  Console.WriteLine(\"Hello, .NET Framework!\");
+              }
+          }" > Program.cs
 
           # Restore and build the project
           dotnet restore
           dotnet build
 
-          # Add the local NuGet source
-          dotnet nuget add source ../bin/nuget -n local
+          
 
           # Install Akka.Analyzers package
           dotnet add package Akka.Analyzers --source local
