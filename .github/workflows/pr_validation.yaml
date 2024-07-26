@@ -55,39 +55,11 @@ jobs:
       - name: "dotnet pack"
         run: dotnet pack -c Release -o ./bin/nuget
 
-      - name: "Create .NET Framework Console App and Install Akka.Analyzers"
+      - name: "Install Akka.Analyzers into .NET Framework Canary"
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        working-directory: ./test/Akka.Analyzers.NetFxInstallCanary
         run: |
-          # Create a directory for the .NET Framework app
-          mkdir DotNetFrameworkApp
-          cd DotNetFrameworkApp
-
-          # Create a new .NET Framework 4.8 console application manually
-          $csprojContent = @"
-          <Project Sdk=""Microsoft.NET.Sdk"">
-            <PropertyGroup>
-              <OutputType>Exe</OutputType>
-              <TargetFramework>net48</TargetFramework>
-              <LangVersion>7.3</LangVersion>
-            </PropertyGroup>
-          </Project>
-          "@
-          $csprojContent | Out-File -Encoding utf8 -FilePath DotNetFrameworkApp.csproj
-
-          # Create a basic Program.cs file
-          $programContent = @"
-          using System;
-          class Program
-          {
-              static void Main()
-              {
-                  Console.WriteLine(""Hello, .NET Framework!"");
-              }
-          }
-          "@
-          $programContent | Out-File -Encoding utf8 -FilePath Program.cs
-
           # Restore and build the project
           dotnet restore
           dotnet build
