@@ -59,25 +59,20 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # Create a directory for the .NET Framework app
-          mkdir DotNetFrameworkApp
+          # Create a new .NET Core console application
+          dotnet new console -o DotNetFrameworkApp
           cd DotNetFrameworkApp
 
-          # Create a new .NET Framework 4.8 console application manually
-          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
-          <Project Sdk=\"Microsoft.NET.Sdk.WindowsDesktop\">
-            <PropertyGroup>
-              <OutputType>Exe</OutputType>
-              <TargetFramework>net48</TargetFramework>
-            </PropertyGroup>
-          </Project>" > DotNetFrameworkApp.csproj
+          # Modify the TargetFramework to net48
+          $projectFile = 'DotNetFrameworkApp.csproj'
+          (Get-Content $projectFile) -replace '<TargetFramework>[^<]*</TargetFramework>', '<TargetFramework>net48</TargetFramework>' | Set-Content $projectFile
 
           # Restore and build the project
           dotnet restore
           dotnet build
 
           # Add the local NuGet source
-          dotnet nuget add source ./bin/nuget -n local
+          dotnet nuget add source ../bin/nuget -n local
 
           # Install Akka.Analyzers package
           dotnet add package Akka.Analyzers --source local
