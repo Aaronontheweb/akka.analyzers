@@ -65,7 +65,7 @@ jobs:
           dotnet build
 
           # Add the local NuGet source
-          dotnet nuget add source ../bin/nuget -n local
+          dotnet nuget add source ../../bin/nuget -n local
 
           ls ../bin/nuget
 
