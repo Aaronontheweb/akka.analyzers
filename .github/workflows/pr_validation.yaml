@@ -60,7 +60,7 @@ jobs:
         shell: pwsh
         run: |
           # Create a new .NET Core console application
-          dotnet new console -o DotNetFrameworkApp
+          dotnet new console -o DotNetFrameworkApp --use-program-main
           cd DotNetFrameworkApp
 
           # Modify the TargetFramework to net48
