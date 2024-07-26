@@ -60,14 +60,9 @@ jobs:
         shell: pwsh
         working-directory: ./test/Akka.Analyzers.NetFxInstallCanary
         run: |
+          # Install Akka.Analyzers package
+          dotnet add package Akka.Analyzers
+
           # Restore and build the project
           dotnet restore
           dotnet build
-
-          # Add the local NuGet source
-          dotnet nuget add source ../../bin/nuget -n local
-
-          ls ../../bin/nuget
-
-          # Install Akka.Analyzers package
-          dotnet add package Akka.Analyzers --source local

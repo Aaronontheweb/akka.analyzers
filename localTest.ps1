@@ -7,7 +7,8 @@ try {
     cd ./test/Akka.Analyzers.NetFxInstallCanary
 
     # Install Akka.Analyzers package
-    dotnet add package Akka.Analyzers --source local
+    # package source mapping should force it to happen using local dir
+    dotnet add package Akka.Analyzers
 
     # Restore and build the project
     dotnet restore
