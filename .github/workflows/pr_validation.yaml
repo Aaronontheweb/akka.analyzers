@@ -53,7 +53,7 @@ jobs:
           fi
 
       - name: "dotnet pack"
-        run: dotnet pack -c Release -o /bin/nuget
+        run: dotnet pack -c Release -o ./bin/nuget
 
       - name: "Create .NET Framework Console App and Install Akka.Analyzers"
         if: matrix.os == 'windows-latest'
