@@ -67,7 +67,7 @@ jobs:
           # Add the local NuGet source
           dotnet nuget add source ../../bin/nuget -n local
 
-          ls ../bin/nuget
+          ls ../../bin/nuget
 
           # Install Akka.Analyzers package
           dotnet add package Akka.Analyzers --source local
