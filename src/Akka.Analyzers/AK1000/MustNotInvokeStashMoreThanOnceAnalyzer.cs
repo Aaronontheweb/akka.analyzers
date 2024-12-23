@@ -43,7 +43,7 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
                 // scope out and see if there are any other stash calls inside the same branch
                 var invocationParent = invocationExpr.DescendantNodes();
 
-                DiagnoseSyntaxNodes(invocationParent, semanticModel, stashMethod, ctx);
+                DiagnoseSyntaxNodes(invocationParent.ToArray(), semanticModel, stashMethod, ctx);
             }
             
             
@@ -51,18 +51,22 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         }, SyntaxKind.InvocationExpression); 
     }
 
-    private static void DiagnoseSyntaxNodes(IEnumerable<SyntaxNode> invocationParent, SemanticModel semanticModel,
+    private static void DiagnoseSyntaxNodes(IReadOnlyList<SyntaxNode> invocationParent, SemanticModel semanticModel,
         IMethodSymbol stashMethod, SyntaxNodeAnalysisContext ctx)
     {
         // Find all "Stash.Stash()" calls in the method
         var stashCalls = invocationParent
             .OfType<InvocationExpressionSyntax>()
-            .Where(invocation => IsStashInvocation(semanticModel, invocation, stashMethod));
+            .Where(invocation => IsStashInvocation(semanticModel, invocation, stashMethod)).ToArray();
+
+        // aren't enough calls to merit further analysis
+        if (stashCalls.Length < 2)
+            return;
         
         // Group calls by their parent block
         var callsGroupedByBlock = stashCalls
             .GroupBy(GetContainingBlock)
-            .Where(group => group.Key != null);
+            .Where(group => group.Key != null).ToArray();
         
         foreach (var group in callsGroupedByBlock)
         {
@@ -99,7 +103,7 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         var stashMethod = akkaContext.AkkaCore.Actor.IStash.Stash!;
         
         var invocationParent = methodDeclaration.DescendantNodes();
-        DiagnoseSyntaxNodes(invocationParent, semanticModel, stashMethod, context);
+        DiagnoseSyntaxNodes(invocationParent.ToArray(), semanticModel, stashMethod, context);
     }
     
     private static bool IsStashInvocation(SemanticModel model, InvocationExpressionSyntax invocation, IMethodSymbol stashMethod)
