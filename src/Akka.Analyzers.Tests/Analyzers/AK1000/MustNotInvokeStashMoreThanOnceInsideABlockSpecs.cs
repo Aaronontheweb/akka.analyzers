@@ -119,6 +119,32 @@ public class MustNotInvokeStashMoreThanOnceInsideABlockSpecs
             public IStash Stash { get; set; } = null!;
         }
         """,
+        
+        // Stash calls inside 2 different code branch (switch statements)
+        """
+        // 05
+        using Akka.Actor;
+
+        public sealed class MyActor : ReceiveActor, IWithStash
+        {
+            public MyActor(int n)
+            {
+                Receive<string>(str =>
+                {
+                    switch(str){
+                        case null:
+                            Stash!.Stash();
+                            break;
+                        default:
+                            Stash!.Stash(); // should not flag this
+                            break;
+                    }
+                });
+            }
+        
+            public IStash Stash { get; set; } = null!;
+        }
+        """,
     };
 
     public static readonly
