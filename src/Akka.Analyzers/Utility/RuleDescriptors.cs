@@ -93,8 +93,8 @@ public static class RuleDescriptors
         title: "Stash.Stash() must not be called more than once", 
         category: AnalysisCategory.ActorDesign, 
         defaultSeverity: DiagnosticSeverity.Error,
-        messageFormat: "Stash.Stash() must not be called more than once because it will create duplicate " +
-                       "messages during unstash which violates message ordering immutability.");
+        messageFormat: "Stash.Stash() must not be called more than once because it will cause runtime errors to be thrown, " +
+                       "due to the Stash actively preventing multiple calls to Stash() creating duplicate messages.");
     
     #endregion
     

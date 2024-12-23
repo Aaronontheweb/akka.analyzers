@@ -216,24 +216,4 @@ internal static class CodeAnalysisExtensions
 
         return refMethods.Any(m => ReferenceEquals(m, methodSymbol));
     }
-
-    public static List<IOperation> Descendants(this BasicBlock block)
-    {
-        var descendants = new List<IOperation>();
-        foreach (var operation in block.Operations)
-        {
-            RecurseOperation(operation, descendants);
-        }
-        return descendants;
-
-        static void RecurseOperation(IOperation operation, List<IOperation> descendants)
-        {
-            descendants.Add(operation);
-            foreach (var childOperation in operation.ChildOperations)
-            {
-                RecurseOperation(childOperation, descendants);
-            }
-        }
-    }
-    
 }
