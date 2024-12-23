@@ -221,6 +221,29 @@ public class MustNotInvokeStashMoreThanOnceInsideABlockSpecs
                 }
                 """, [(8, 9, 8, 22),
                     (13, 17, 13, 30)]),
+            
+            // UntypedActor invoking Stash() twice with a switch, but one is outside
+            (
+                """
+                // 05
+                using Akka.Actor;
+
+                public class MyUntypedActor : UntypedActor, IWithStash
+                {
+                    protected override void OnReceive(object message)
+                    {
+                        Stash.Stash();
+                        
+                        if(message is string s)
+                        {
+                            Stash.Stash(); // Error
+                        }
+                    }
+                
+                    public IStash Stash { get; set; } = null!;
+                }
+                """, [(8, 9, 8, 22),
+                    (13, 17, 13, 30)]),
         };
 
     private readonly ITestOutputHelper _output;
