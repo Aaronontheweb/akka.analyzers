@@ -30,7 +30,6 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
             var semanticModel = ctx.SemanticModel;
             var akkaCore = akkaContext.AkkaCore;
             var stashMethod = akkaCore.Actor.IStash.Stash!;
-            var foundDuplicates = false;
 
             // First: need to check if this method / lambda is declared in an ActorBase subclass
             var symbol = semanticModel.GetSymbolInfo(node).Symbol;
@@ -43,58 +42,21 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
                 .Where(c => IsStashInvocation(semanticModel, c, stashMethod))
                 .ToList();
 
-            // If there are less than 2 stash calls, we can skip the rest of the analysis
             if (stashCalls.Count < 2)
                 return;
 
             // Flag all stash calls if they are in the same block without branching
-            var sameScopeCalls = stashCalls
+            var groupedByBlock = stashCalls
                 .GroupBy(GetContainingBlock)
-                .Where(group => group.Key != null).ToArray();
+                .Where(group => group.Key != null && group.Count() > 1)
+                .SelectMany(group => group)
+                .ToList();
 
-            foreach (var group in sameScopeCalls)
+            // Report all calls in the same block
+            foreach (var call in groupedByBlock)
             {
-                var callsInBlock = group.ToList();
-                // simple / dumb check - are there multiple calls to Stash in the same block?
-                if (callsInBlock.Count > 1)
-                {
-                    foundDuplicates = true;
-                    goto FoundProblems;
-                }
+                ReportDiagnostic(call, ctx);
             }
-
-            // if sameScopeCalls == all the duplicates, skip the depth analysis
-            if (sameScopeCalls.Sum(c => c.Count()) == stashCalls.Count)
-                return;
-            
-            
-            var blockSyntax = node as BlockSyntax ?? node.ChildNodes().OfType<BlockSyntax>().FirstOrDefault();
-            if (blockSyntax == null)
-                return;
-
-            var controlFlowAnalysis = semanticModel.AnalyzeControlFlow(blockSyntax);
-            if (controlFlowAnalysis is not { Succeeded: true })
-                return;
-            
-            // Now analyze control flow for mutually exclusive paths
-            var reachableCalls = stashCalls
-                .Where(call => controlFlowAnalysis.EntryPoints
-                    .Contains(call.AncestorsAndSelf().OfType<StatementSyntax>().FirstOrDefault()!)).ToList();
-
-
-            if (reachableCalls.Count > 1)
-            {
-                foundDuplicates = true;
-            }
-
-            FoundProblems:
-                if (!foundDuplicates) return;
-                {
-                    foreach (var call in stashCalls)
-                    {
-                        ReportDiagnostic(call, ctx);
-                    }
-                }
         }, SyntaxKind.MethodDeclaration, SyntaxKind.InvocationExpression);
         return;
 
@@ -114,8 +76,9 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         return SymbolEqualityComparer.Default.Equals(symbol, stashMethod);
     }
 
-    private static BlockSyntax? GetContainingBlock(SyntaxNode node)
+    private static SyntaxNode? GetContainingBlock(SyntaxNode node)
     {
-        return node.AncestorsAndSelf().OfType<BlockSyntax>().FirstOrDefault();
+        return node.AncestorsAndSelf()
+            .FirstOrDefault(n => n is BlockSyntax || n is SwitchSectionSyntax || n is MethodDeclarationSyntax);
     }
 }
