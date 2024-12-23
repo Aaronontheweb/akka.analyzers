@@ -63,37 +63,78 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         if (stashCalls.Length < 2)
             return;
         
+        foreach(var stashCall in stashCalls)
+        {
+          stashCall.GetLocation();
+        }
+        
         // Group calls by their parent block
         var callsGroupedByBlock = stashCalls
             .GroupBy(GetContainingBlock)
             .Where(group => group.Key != null).ToArray();
         
+        // so we don't log multiple warnings for the same call, in the event someone has done something truly stupid
+        var alreadyTouched = new Dictionary<InvocationExpressionSyntax, bool>();
+        
         foreach (var group in callsGroupedByBlock)
         {
             var callsInBlock = group.ToList();
 
-            // can't be null - we check for that on line 47
-            if (callsInBlock.Count > 1 && !AreCallsSeparatedByConditionals(group.Key!, callsInBlock))
+            // simple / dumb check - are there multiple calls to Stash in the same block?
+            if (callsInBlock.Count > 1)
             {
-                // we could skip the first stash call here, but since we don't know _which_ call is the offending
-                // duplicate, we'll just report all of them
                 foreach (var stashCall in callsInBlock)
                 {
-                    var diagnostic = Diagnostic.Create(
-                        descriptor:RuleDescriptors.Ak1008MustNotInvokeStashMoreThanOnce,
-                        location:stashCall.GetLocation());
-                    ctx.ReportDiagnostic(diagnostic);
+                    ReportIfNotDoneAlready(alreadyTouched, stashCall);
                 }
             }
+            
+            // depth check
+            var block = group.Key!;
+            var descendantCalls = block.DescendantNodes().OfType<InvocationExpressionSyntax>()
+                .Where(invocation => IsStashInvocation(semanticModel, invocation, stashMethod))
+                .ToList();
+                
+            // if there are no other Stash calls in the block, we can skip this block
+            if (descendantCalls.Count <= 1)
+                continue;
+                
+            // if there are other Stash calls in the block, they're bad - flag em
+            foreach (var descendantCall in descendantCalls)
+            {
+                ReportIfNotDoneAlready(alreadyTouched, descendantCall);
+            }
+                
+            // also need to flag the original call
+            ReportIfNotDoneAlready(alreadyTouched, callsInBlock[0]);
+            
+        }
+
+        return;
+
+        void ReportIfNotDoneAlready(Dictionary<InvocationExpressionSyntax, bool> dictionary, InvocationExpressionSyntax descendantCall)
+        {
+            // we've already flagged this call as a duplicate, skip it
+            if (dictionary.TryGetValue(descendantCall, out var value) && value)
+                return;
+                    
+            dictionary[descendantCall] = true;
+            var diagnostic = Diagnostic.Create(
+                descriptor:RuleDescriptors.Ak1008MustNotInvokeStashMoreThanOnce,
+                location:descendantCall.GetLocation());
+            ctx.ReportDiagnostic(diagnostic);
         }
     }
+    
+    /*
+ // we could skip the first stash call here, but since we don't know _which_ call is the offending
+                // duplicate, we'll just report all of them
+                */
 
     private static void AnalyzeMethodDeclaration(SyntaxNodeAnalysisContext context, AkkaContext akkaContext)
     {
         var semanticModel = context.SemanticModel;
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
-        
-        // SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, stashMethod)
         
         // First: need to check if this method is declared in an ActorBase subclass
         var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
