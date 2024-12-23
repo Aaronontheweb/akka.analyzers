@@ -32,9 +32,13 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         var methodDeclaration = (MethodDeclarationSyntax)context.Node;
         
         // SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, stashMethod)
+        
+        // First: need to check if this method is declared in an ActorBase subclass
+        var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
+        if (methodSymbol is null || !methodSymbol.ContainingType.IsActorBaseSubclass(akkaContext.AkkaCore))
+            return;
 
         var stashMethod = akkaContext.AkkaCore.Actor.IStash.Stash!;
-        var stashInvocations = new Dictionary<BasicBlock, int>();
         
          // Find all "Stash.Stash()" calls in the method
         var stashCalls = methodDeclaration.DescendantNodes()

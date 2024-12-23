@@ -77,7 +77,7 @@ public sealed class MyActor
 using System;
 using Akka.Actor;
 
-public class MyActor: IWithStash
+public class MyActor
 {
     public MyActor(IStash stash)
     {
