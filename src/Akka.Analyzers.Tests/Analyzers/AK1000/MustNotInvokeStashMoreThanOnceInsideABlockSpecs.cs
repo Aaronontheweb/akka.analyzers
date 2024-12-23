@@ -6,6 +6,7 @@
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Testing;
 using Xunit.Abstractions;
 using Verify = Akka.Analyzers.Tests.Utility.AkkaVerifier<Akka.Analyzers.MustNotInvokeStashMoreThanOnceAnalyzer>;
 
@@ -16,172 +17,219 @@ public class MustNotInvokeStashMoreThanOnceInsideABlockSpecs
     public static readonly TheoryData<string> SuccessCases = new()
     {
         // ReceiveActor with single Stash() invocation
-"""
-// 01
-using Akka.Actor;
-using System.Threading.Tasks;
+        """
+        // 01
+        using Akka.Actor;
+        using System.Threading.Tasks;
 
-public sealed class MyActor : ReceiveActor, IWithStash
-{
-    public MyActor()
-    {
-        Receive<string>(str => {
-            Sender.Tell(str);
-            Stash.Stash(); // should not flag this
-        });
-    }
-    
-    public void Handler()
-    {
-        Stash.Stash();
-    }
-
-    public IStash Stash { get; set; }
-}
-""",
+        public sealed class MyActor : ReceiveActor, IWithStash
+        {
+            public MyActor()
+            {
+                Receive<string>(str => {
+                    Sender.Tell(str);
+                    Stash.Stash(); // should not flag this
+                });
+            }
+            
+            public void Handler()
+            {
+                Stash.Stash();
+            }
+        
+            public IStash Stash { get; set; }
+        }
+        """,
 
         // Non-Actor class that has Stash() methods, we're not responsible for this.
-"""
-// 02
-public interface INonAkkaStash
-{
-    public void Stash();
-}
+        """
+        // 02
+        public interface INonAkkaStash
+        {
+            public void Stash();
+        }
 
-public class NonAkkaStash : INonAkkaStash
-{
-    public void Stash() { }
-}
+        public class NonAkkaStash : INonAkkaStash
+        {
+            public void Stash() { }
+        }
 
-public sealed class MyActor
-{
-    public MyActor()
-    {
-        Stash = new NonAkkaStash();
-    }
-
-    public void Test()
-    {
-        Stash.Stash();
-        Stash.Stash(); // should not flag this
-    }
-    
-    public INonAkkaStash Stash { get; }
-}
-""",
+        public sealed class MyActor
+        {
+            public MyActor()
+            {
+                Stash = new NonAkkaStash();
+            }
+        
+            public void Test()
+            {
+                Stash.Stash();
+                Stash.Stash(); // should not flag this
+            }
+            
+            public INonAkkaStash Stash { get; }
+        }
+        """,
 
         // Non-Actor class that uses Stash(),
         // we're only responsible for checking usage inside ActorBase class and its descendants.
-"""
-// 03
-using System;
-using Akka.Actor;
+        """
+        // 03
+        using System;
+        using Akka.Actor;
 
-public class MyActor
-{
-    public MyActor(IStash stash)
-    {
-        Stash = stash;
-    }
-
-    public void Test()
-    {
-        Stash.Stash();
-        Stash.Stash(); // should not flag this
-    }
-
-    public IStash Stash { get; set; }
-}
-""",
-        // Stash calls inside 2 different code branch
-"""
-// 04
-using Akka.Actor;
-
-public sealed class MyActor : ReceiveActor, IWithStash
-{
-    public MyActor(int n)
-    {
-        Receive<string>(str =>
+        public class MyActor
         {
-            if(n < 0)
+            public MyActor(IStash stash)
             {
-                Stash!.Stash();
+                Stash = stash;
             }
-            else
+        
+            public void Test()
             {
-                Stash!.Stash(); // should not flag this
+                Stash.Stash();
+                Stash.Stash(); // should not flag this
             }
-        });
-    }
+        
+            public IStash Stash { get; set; }
+        }
+        """,
+        // Stash calls inside 2 different code branch
+        """
+        // 04
+        using Akka.Actor;
 
-    public IStash Stash { get; set; } = null!;
-}
-""",
+        public sealed class MyActor : ReceiveActor, IWithStash
+        {
+            public MyActor(int n)
+            {
+                Receive<string>(str =>
+                {
+                    if(n < 0)
+                    {
+                        Stash!.Stash();
+                    }
+                    else
+                    {
+                        Stash!.Stash(); // should not flag this
+                    }
+                });
+            }
+        
+            public IStash Stash { get; set; } = null!;
+        }
+        """,
     };
 
     public static readonly
-        TheoryData<(string testData, (int startLine, int startColumn, int endLine, int endColumn) spanData)>
+        TheoryData<(string testData, (int startLine, int startColumn, int endLine, int endColumn)[] spanData)>
         FailureCases = new()
         {
             // Receive actor invoking Stash()
             (
-"""
-// 01
-using System;
-using Akka.Actor;
-using System.Threading.Tasks;
+                """
+                // 01
+                using System;
+                using Akka.Actor;
+                using System.Threading.Tasks;
 
-public sealed class MyActor : ReceiveActor, IWithStash
-{
-    public MyActor()
-    {
-        Receive<string>(str => 
-        {
-            Stash.Stash();
-            Stash.Stash(); // Error
-        });
-    }
+                public sealed class MyActor : ReceiveActor, IWithStash
+                {
+                    public MyActor()
+                    {
+                        Receive<string>(str => 
+                        {
+                            Stash.Stash();
+                            Stash.Stash(); // Error
+                        });
+                    }
+                
+                    public IStash Stash { get; set; } = null!;
+                }
+                """, [
+                    (13, 13, 13, 26),
+                    (14, 13, 14, 26)
+                ]),
 
-    public IStash Stash { get; set; } = null!;
-}
-""", (13, 13, 13, 26)),
-            
             // Receive actor invoking Stash() inside and outside of a code branch
             (
-"""
-// 02
-using System;
-using Akka.Actor;
-using System.Threading.Tasks;
+                """
+                // 02
+                using System;
+                using Akka.Actor;
+                using System.Threading.Tasks;
 
-public sealed class MyActor : ReceiveActor, IWithStash
-{
-    public MyActor(int n)
-    {
-        Receive<string>(str =>
-        {
-            if(n < 0)
-            {
-                Stash!.Stash();
-            }
-            
-            Stash.Stash(); // Error
-        });
-    }
+                public sealed class MyActor : ReceiveActor, IWithStash
+                {
+                    public MyActor(int n)
+                    {
+                        Receive<string>(str =>
+                        {
+                            if(n < 0)
+                            {
+                                Stash!.Stash();
+                            }
+                            
+                            Stash.Stash(); // Error
+                        });
+                    }
+                
+                    public IStash Stash { get; set; } = null!;
+                }
+                """, [(12, 13, 12, 105),
+                    (15, 13, 15, 26)]),
 
-    public IStash Stash { get; set; } = null!;
-}
-""", (12, 13, 12, 105)),
-            };
-    
+            // UntypedActor invoking Stash() twice without branching
+            (
+                """
+                // 03
+                using Akka.Actor;
+
+                public class MyUntypedActor : UntypedActor, IWithStash
+                {
+                    protected override void OnReceive(object message)
+                    {
+                        Stash.Stash();
+                        Stash.Stash(); // Error
+                    }
+                
+                    public IStash Stash { get; set; } = null!;
+                }
+                """, [(8, 9, 8, 22),
+                    (9, 9, 9, 22)]),
+            // UntypedActor invoking Stash() twice with a switch, but one is outside
+            (
+                """
+                // 04
+                using Akka.Actor;
+
+                public class MyUntypedActor : UntypedActor, IWithStash
+                {
+                    protected override void OnReceive(object message)
+                    {
+                        Stash.Stash();
+                        
+                        switch(message)
+                        {
+                            case string s:
+                                Stash.Stash(); // Error
+                                break;
+                        }
+                    }
+                
+                    public IStash Stash { get; set; } = null!;
+                }
+                """, [(8, 9, 8, 22),
+                    (13, 17, 13, 30)]),
+        };
+
     private readonly ITestOutputHelper _output;
-    
+
     public MustNotInvokeStashMoreThanOnceInsideABlockSpecs(ITestOutputHelper output)
     {
         _output = output;
     }
-    
+
     [Theory]
     [MemberData(nameof(SuccessCases))]
     public Task SuccessCase(string testCode)
@@ -192,14 +240,16 @@ public sealed class MyActor : ReceiveActor, IWithStash
     [Theory]
     [MemberData(nameof(FailureCases))]
     public Task FailureCase(
-        (string testCode, (int startLine, int startColumn, int endLine, int endColumn) spanData) d)
+        (string testCode, (int startLine, int startColumn, int endLine, int endColumn)[] spanData) d)
     {
-        var expected = Verify.Diagnostic()
-            .WithSpan(d.spanData.startLine, d.spanData.startColumn, d.spanData.endLine, d.spanData.endColumn)
-            .WithSeverity(DiagnosticSeverity.Error);
+        List<DiagnosticResult> expectedResults = new();
+        
+        foreach(var (startLine, startColumn, endLine, endColumn) in d.spanData)
+        {
+            var expected = Verify.Diagnostic().WithSpan(startLine, startColumn, endLine, endColumn).WithSeverity(DiagnosticSeverity.Error);
+            expectedResults.Add(expected);
+        }
 
-        return Verify.VerifyAnalyzer(d.testCode, expected);
+        return Verify.VerifyAnalyzer(d.testCode, expectedResults.ToArray());
     }
-
 }
-
