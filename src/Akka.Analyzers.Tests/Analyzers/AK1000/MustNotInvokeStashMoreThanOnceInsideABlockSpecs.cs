@@ -177,7 +177,7 @@ public class MustNotInvokeStashMoreThanOnceInsideABlockSpecs
                     public IStash Stash { get; set; } = null!;
                 }
                 """, [(12, 13, 12, 105),
-                    (15, 13, 15, 26)]),
+                    (14, 13, 14, 26)]),
 
             // UntypedActor invoking Stash() twice without branching
             (
@@ -243,7 +243,7 @@ public class MustNotInvokeStashMoreThanOnceInsideABlockSpecs
                     public IStash Stash { get; set; } = null!;
                 }
                 """, [(8, 9, 8, 22),
-                    (13, 17, 13, 30)]),
+                    (12, 17, 12, 30)]),
         };
 
     private readonly ITestOutputHelper _output;
