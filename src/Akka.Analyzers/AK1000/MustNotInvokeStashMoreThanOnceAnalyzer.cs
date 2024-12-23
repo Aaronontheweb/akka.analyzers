@@ -23,25 +23,39 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         Guard.AssertIsNotNull(context);
         Guard.AssertIsNotNull(akkaContext);
 
-        context.RegisterSyntaxNodeAction(ctx => AnalyzeMethod(ctx, akkaContext), SyntaxKind.MethodDeclaration);
+        // For methods inside the actor
+        context.RegisterSyntaxNodeAction(ctx => AnalyzeMethodDeclaration(ctx, akkaContext), SyntaxKind.MethodDeclaration);
+        
+        // For lambdas, namely Receive<T> and ReceiveAny
+        context.RegisterSyntaxNodeAction(ctx =>
+        {
+            var invocationExpr = (InvocationExpressionSyntax)ctx.Node;
+            var semanticModel = ctx.SemanticModel;
+            var akkaCore = akkaContext.AkkaCore;
+            var stashMethod = akkaCore.Actor.IStash.Stash!;
+
+            var invocationSymbol = semanticModel.GetSymbolInfo(invocationExpr.Expression).Symbol;
+            
+            // if this invocation expression is not invoking a method OR it's not part of an actor base type, skip
+            if (invocationSymbol is not null && invocationSymbol.ContainingType.IsActorBaseSubclass(akkaCore))
+            {
+                // if we've made it here, we are inside a context where at least one Stash call has been found
+                // scope out and see if there are any other stash calls inside the same branch
+                var invocationParent = invocationExpr.DescendantNodes();
+
+                DiagnoseSyntaxNodes(invocationParent, semanticModel, stashMethod, ctx);
+            }
+            
+            
+            
+        }, SyntaxKind.InvocationExpression); 
     }
 
-    private static void AnalyzeMethod(SyntaxNodeAnalysisContext context, AkkaContext akkaContext)
+    private static void DiagnoseSyntaxNodes(IEnumerable<SyntaxNode> invocationParent, SemanticModel semanticModel,
+        IMethodSymbol stashMethod, SyntaxNodeAnalysisContext ctx)
     {
-        var semanticModel = context.SemanticModel;
-        var methodDeclaration = (MethodDeclarationSyntax)context.Node;
-        
-        // SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, stashMethod)
-        
-        // First: need to check if this method is declared in an ActorBase subclass
-        var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
-        if (methodSymbol is null || !methodSymbol.ContainingType.IsActorBaseSubclass(akkaContext.AkkaCore))
-            return;
-
-        var stashMethod = akkaContext.AkkaCore.Actor.IStash.Stash!;
-        
-         // Find all "Stash.Stash()" calls in the method
-        var stashCalls = methodDeclaration.DescendantNodes()
+        // Find all "Stash.Stash()" calls in the method
+        var stashCalls = invocationParent
             .OfType<InvocationExpressionSyntax>()
             .Where(invocation => IsStashInvocation(semanticModel, invocation, stashMethod));
         
@@ -64,10 +78,28 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
                     var diagnostic = Diagnostic.Create(
                         descriptor:RuleDescriptors.Ak1008MustNotInvokeStashMoreThanOnce,
                         location:stashCall.GetLocation());
-                    context.ReportDiagnostic(diagnostic);
+                    ctx.ReportDiagnostic(diagnostic);
                 }
             }
         }
+    }
+
+    private static void AnalyzeMethodDeclaration(SyntaxNodeAnalysisContext context, AkkaContext akkaContext)
+    {
+        var semanticModel = context.SemanticModel;
+        var methodDeclaration = (MethodDeclarationSyntax)context.Node;
+        
+        // SymbolEqualityComparer.Default.Equals(invocation.TargetMethod, stashMethod)
+        
+        // First: need to check if this method is declared in an ActorBase subclass
+        var methodSymbol = semanticModel.GetDeclaredSymbol(methodDeclaration);
+        if (methodSymbol is null || !methodSymbol.ContainingType.IsActorBaseSubclass(akkaContext.AkkaCore))
+            return;
+
+        var stashMethod = akkaContext.AkkaCore.Actor.IStash.Stash!;
+        
+        var invocationParent = methodDeclaration.DescendantNodes();
+        DiagnoseSyntaxNodes(invocationParent, semanticModel, stashMethod, context);
     }
     
     private static bool IsStashInvocation(SemanticModel model, InvocationExpressionSyntax invocation, IMethodSymbol stashMethod)
@@ -87,7 +119,7 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
 
         foreach (var call in calls)
         {
-            bool isInConditional = conditionals.Any(ifStatement => ifStatement.Contains(call));
+            var isInConditional = conditionals.Any(ifStatement => ifStatement.Contains(call));
 
             if (!isInConditional)
             {

@@ -147,8 +147,8 @@ public class MustNotInvokeStashMoreThanOnceInsideABlockSpecs
                     public IStash Stash { get; set; } = null!;
                 }
                 """, [
-                    (13, 13, 13, 26),
-                    (14, 13, 14, 26)
+                    (12, 13, 12, 26),
+                    (13, 13, 13, 26)
                 ]),
 
             // Receive actor invoking Stash() inside and outside of a code branch
