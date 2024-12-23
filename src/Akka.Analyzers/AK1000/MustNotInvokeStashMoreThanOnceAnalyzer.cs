@@ -23,7 +23,7 @@ public class MustNotInvokeStashMoreThanOnceAnalyzer()
         Guard.AssertIsNotNull(context);
         Guard.AssertIsNotNull(akkaContext);
 
-        context.RegisterSyntaxNodeAction(ctx => AnalyzeMethod(ctx, akkaContext), SyntaxKind.MethodDeclaration, SyntaxKind.ConstructorDeclaration);
+        context.RegisterSyntaxNodeAction(ctx => AnalyzeMethod(ctx, akkaContext), SyntaxKind.MethodDeclaration);
     }
 
     private static void AnalyzeMethod(SyntaxNodeAnalysisContext context, AkkaContext akkaContext)
